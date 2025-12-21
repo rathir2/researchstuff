@@ -12,8 +12,11 @@ library(knitr)
 library(tibble)
 library(lubridate)
 library(ggsurvfit)
+library(survival)
 library(tidycmprsk)
 library(devtools)
+
+ezfun::set_ccf_palette("contrast")
 
 #load data
 hccdata <- read_csv("HCC Database.csv")
@@ -62,8 +65,8 @@ hccdata$TACE[hccdata$TACE == "Unknown"] <- 0
 hccdata$y90[hccdata$y90 == "Yes"] <- 1
 hccdata$y90[hccdata$y90 == "Unknown"] <- 0
 hccdata$y90[hccdata$y90 == "No"] <- 0
-hccdata$totalpreopburden <- data.matrix(as.numeric(hccdata$TACE)) +
-  data.matrix(as.numeric(hccdata$RFA)) + data.matrix(as.numeric(hccdata$y90))
+hccdata$totalpreopburden <- as.numeric(hccdata$TACE) +
+  as.numeric(hccdata$RFA) + as.numeric(hccdata$y90)
 
 #recurrence site
 hccdata$'Intra- vs Extra-hepatic'[hccdata$'Intra- vs Extra-hepatic' == "1"] <- "Intrahepatic"
@@ -89,15 +92,15 @@ hccdata$Survival[hccdata$Survival == '1'] <- "Yes"
 hccdata$Survival[hccdata$Survival == '2'] <- "No"
 
 colnames(hccdata)[55]<- "Total tumor size"
-hccdata <- hccdata[,-80]
 #output table
-outputdata <-hccdata[,c('Sex','Age','Race','diagnosis for cirrhosis','AFP', 'MELD Score'
+colnames(hccdata)[52] <- "size, largest"
+outputdata <-hccdata[,c('Sex','Age','diagnosis for cirrhosis','AFP', 'MELD Score'
                         , 'WBC (10^9/L)', 'ALT', 'Cr', 'T. bili (mg/dL)', 'INR', 'Na'
-                        , 'TACE','RFA', 'y90', 'totalpreopburden', 'Operation name','surgery type', 'Operative time', 
+                        , 'TACE','RFA', 'y90', 'totalpreopburden', 'surgery type', 'Operative time', 
                         'Transfused pRBC (mL)', 'LOS (days post-op to discharge)', 
-                        'Total tumor size', 'tumor number', 'tumor necrosis', 'Microvessel invasion',
+                        'Total tumor size', 'Tumor number', 'tumor necrosis', 'Microvessel invasion',
                         'Macrovessel invasion', 'Recurrence', 'Intra- vs Extra-hepatic', 'Survival',
-                        'Date of death', 'Date of last follow up', 'AJCC staging', 'size, largest'
+                        'Date of last follow up', 'AJCC staging', 'Date of death', 'size, largest'
                         )
                      ]
 outputnames <- read_excel("template names.xlsx")
@@ -325,9 +328,58 @@ survtable <- gt(resultsdf)
 gtsave(survtable, 'log_rank_results.html')
 
 #Cox test
-hcccox <- coxph(Surv(time, status)~ factor(Total_IR_Burden), data = outputtable)
+last_fusurvcurve <-as.integer(as.Date(outputdata$`Date of last follow up`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
+time <- as.integer(as.Date(outputdata$`Date of death`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
+time[is.na(time)] <- last_fusurvcurve[is.na(time)]
+outputdata$Survival[outputdata$Survival == "Yes"] <- "0"
+outputdata$Survival[1] <- NA
+outputdata$Survival[outputdata$Survival == "No"] <- "1"
+status <- as.integer(outputdata$Survival)
+
+hcccox <- coxph(Surv(time, status)~ factor(totalpreopburden), data = outputdata)
 summary(hcccox)
 
+Surv(time, status)
+survcurve <- survfit(Surv(time, status)~1, data = outputdata)
+#Kaplan meier curve
+survfit2(Surv(time, status)~1, data = outputdata) |>
+  ggsurvfit() +
+  ylim(0,1) +
+  labs(
+    x = "Days",
+    y = "Overall survival probability"
+  ) + 
+  add_confidence_interval() + 
+  add_risktable()
+
+#setting up barplot for LRT burden effect on necrosis
+outputdata$`tumor necrosis`[1] = ""
+outputdata$`tumor necrosis`[outputdata$`tumor necrosis` == "Yes"] = "1"
+outputdata$`tumor necrosis`[outputdata$`tumor necrosis` == ""] = "2"
+noburdennec <- as.numeric(na.omit(outputdata$`tumor necrosis`[outputdata$`totalpreopburden` == 0]))
+someburdennec <- as.numeric(na.omit(outputdata$`tumor necrosis`[outputdata$`totalpreopburden` == 1]))
+multburdennec <- as.numeric(na.omit(append(outputdata$`tumor necrosis`[outputdata$`totalpreopburden` == 2], 
+                        outputdata$`tumor necrosis`[outputdata$`totalpreopburden` == 3])))
+
+barplotdata <- data.frame(x = c("No prior LRT", "Single prior LRT", "Multiple prior LRT"),
+                          y = c(mean(noburdennec == 1)*100, mean(someburdennec == 1)*100, mean(multburdennec == 1)*100))
+barplotdata <- arrange(barplotdata)
+  
+#anova
+aovnecro <- aov(y~x, data = barplotdata)
+#tukey- this doesnt work and im not competent enough to know why
+fx <- factor(outputdata$totalpreopburden)
+tukeynecro <- TukeyHSD(aov(outputdata$'tumor necrosis'~fx, data = outputdata))
 
 
 
+#bar plot
+textlabel <- c("a", 'b', 'b')
+barplotdata %>%
+  mutate(x = fct_relevel(x, "No prior LRT", "Single prior LRT", "Multiple prior LRT")) %>%
+  ggplot(aes(x = x,y = y)) + 
+  geom_bar(stat = "identity", width = .5) +
+  geom_text(aes(label=textlabel), vjust=0) +
+  labs(x = "Previous IR burden", y = "Tumors with Necrosis (%)",
+       title ="Central Tumor Necrosis on Histology by LRT Burden") +
+  theme_minimal()
