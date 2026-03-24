@@ -94,11 +94,11 @@ hccdata$Survival[hccdata$Survival == '2'] <- "No"
 colnames(hccdata)[55]<- "Total tumor size"
 #output table
 colnames(hccdata)[52] <- "size, largest"
-outputdata <-hccdata[,c('Sex','Age','diagnosis for cirrhosis','AFP', 'MELD Score'
+outputdata <-hccdata[,c('Sex','Age','Race', 'diagnosis for cirrhosis','AFP', 'MELD Score'
                         , 'WBC (10^9/L)', 'ALT', 'Cr', 'T. bili (mg/dL)', 'INR', 'Na'
                         , 'TACE','RFA', 'y90', 'totalpreopburden', 'surgery type', 'Operative time', 
                         'Transfused pRBC (mL)', 'LOS (days post-op to discharge)', 
-                        'Total tumor size', 'Tumor number', 'tumor necrosis', 'Microvessel invasion',
+                        'Total tumor size', 'tumor number', 'tumor necrosis', 'Microvessel invasion',
                         'Macrovessel invasion', 'Recurrence', 'Intra- vs Extra-hepatic', 'Survival',
                         'Date of last follow up', 'AJCC staging', 'Date of death', 'size, largest'
                         )
@@ -108,7 +108,6 @@ colnames(outputdata) <- colnames(outputnames)[-1]
 
 outputdata$`Race`<- as.character(outputdata$`Race`)
 outputdata$'Cirrhosis_Etiology'<- as.character(outputdata$`Cirrhosis_Etiology`)
-outputdata$`diagnosis for cirrhosis`<- as.character(outputdata$`diagnosis for cirrhosis`)
 
 
 write.xlsx(outputdata,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/HCC/HCCcleaned.xlsx", 
@@ -329,20 +328,21 @@ gtsave(survtable, 'log_rank_results.html')
 
 #Cox test
 last_fusurvcurve <-as.integer(as.Date(outputdata$`Date of last follow up`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
-time <- as.integer(as.Date(outputdata$`Date of death`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
+time <- na.omit(as.integer(as.Date(outputdata$`Date_of_Death`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y")))
 time[is.na(time)] <- last_fusurvcurve[is.na(time)]
 outputdata$Survival[outputdata$Survival == "Yes"] <- "0"
 outputdata$Survival[1] <- NA
 outputdata$Survival[outputdata$Survival == "No"] <- "1"
-status <- as.integer(outputdata$Survival)
+status <- na.omit(as.integer(outputdata$Survival_Status))
 
 hcccox <- coxph(Surv(time, status)~ factor(totalpreopburden), data = outputdata)
 summary(hcccox)
 
 Surv(time, status)
-survcurve <- survfit(Surv(time, status)~1, data = outputdata)
+survcurve <- survfit(Surv(time, status)~factor(Total_IR_Burden), data = outputdata)
 #Kaplan meier curve
-survfit2(Surv(time, status)~1, data = outputdata) |>
+burden <- na.omit(outputdata$Total_IR_Burden)
+survfit2(Surv(time, status) ~ burden, data = outputdata, start.time = 0) |>
   ggsurvfit() +
   ylim(0,1) +
   labs(
@@ -351,6 +351,7 @@ survfit2(Surv(time, status)~1, data = outputdata) |>
   ) + 
   add_confidence_interval() + 
   add_risktable()
+
 
 #setting up barplot for LRT burden effect on necrosis
 outputdata$`tumor necrosis`[1] = ""
