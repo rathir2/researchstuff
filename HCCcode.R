@@ -1,3 +1,11 @@
+# Author: Rohan Rathi
+# Date: 3/24/2026
+# Project: HCC
+# Lines 1- ~116 are for initial cleanup of HCCdatabase.xlsx, producing HCCcleaned.xlsx. Afterwards uses
+# HCCcleaned via outputtable for developing tables. Many lines that are commented away on kaplan meier 
+# are covered in HCCsurvcurves.R
+
+
 library(ggplot2)
 library(dplyr)
 library(readxl)
@@ -328,30 +336,64 @@ gtsave(survtable, 'log_rank_results.html')
 
 #Cox test
 last_fusurvcurve <-as.integer(as.Date(outputdata$`Date of last follow up`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
-time <- na.omit(as.integer(as.Date(outputdata$`Date_of_Death`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y")))
+time <- as.integer(as.Date(outputdata$`Date_of_Death`, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
 time[is.na(time)] <- last_fusurvcurve[is.na(time)]
 outputdata$Survival[outputdata$Survival == "Yes"] <- "0"
 outputdata$Survival[1] <- NA
 outputdata$Survival[outputdata$Survival == "No"] <- "1"
-status <- na.omit(as.integer(outputdata$Survival_Status))
+status <- as.integer(outputdata$Survival_Status)
 
-hcccox <- coxph(Surv(time, status)~ factor(totalpreopburden), data = outputdata)
+hcccox <- coxph(Surv(time, status)~ factor(Total_IR_Burden), data = outputtable)
 summary(hcccox)
 
-Surv(time, status)
-survcurve <- survfit(Surv(time, status)~factor(Total_IR_Burden), data = outputdata)
 #Kaplan meier curve
-burden <- na.omit(outputdata$Total_IR_Burden)
-survfit2(Surv(time, status) ~ burden, data = outputdata, start.time = 0) |>
-  ggsurvfit() +
-  ylim(0,1) +
-  labs(
-    x = "Days",
-    y = "Overall survival probability"
-  ) + 
-  add_confidence_interval() + 
-  add_risktable()
+# burden <- subset(outputtable$Total_IR_Burden, outputtable$Total_IR_Burden == 1)
+# survfit2(Surv(time, status) ~ 1, data = outputdata, start.time = 0) |>
+#   ggsurvfit() +
+#   ylim(0,1) +
+#   labs(
+#     x = "Days",
+#     y = "Overall survival probability"
+#   ) + 
+#   add_confidence_interval() + 
+#   add_risktable()
+# 
+# 
+# survfit2(Surv(time, status) ~ 1, data = subset(outputtable, Total_IR_Burden == 0), start.time = 0) |>
+#   ggsurvfit() +
+#   ylim(0,1) +
+#   labs(
+#     x = "Days",
+#     y = "Overall survival probability"
+#   ) + 
+#   add_confidence_interval() + 
+#   add_risktable()
+# survfit2(Surv(time, status) ~ 1, data = subset(outputtable, Total_IR_Burden == 1), start.time = 0) |>
+#   ggsurvfit() +
+#   ylim(0,1) +
+#   labs(
+#     x = "Days",
+#     y = "Overall survival probability"
+#   ) + 
+#   add_confidence_interval() + 
+#   add_risktable()
+# survfit2(Surv(time, status) ~ 1, data = subset(outputtable, Total_IR_Burden == 2), start.time = 0) |>
+#   ggsurvfit() +
+#   ylim(0,1) +
+#   labs(
+#     x = "Days",
+#     y = "Overall survival probability"
+#   ) + 
+#   add_confidence_interval() + 
+#   add_risktable()
+# list_of_fits <- list(US = fit0, OS = fit1, PFS = fit2)
+# list_of_data <- list()
 
+# ggsurvplot_combine(list_of_fits, list_of_data,
+#                    risk.table = TRUE,
+#                    pval = TRUE,
+#                    legend.labs = c("Overall Survival", "PFS"),
+#                    palette = c("darkblue", "orange"))
 
 #setting up barplot for LRT burden effect on necrosis
 outputdata$`tumor necrosis`[1] = ""
