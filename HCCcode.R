@@ -23,6 +23,7 @@ library(ggsurvfit)
 library(survival)
 library(tidycmprsk)
 library(devtools)
+library(dunn.test)
 
 ezfun::set_ccf_palette("contrast")
 
@@ -345,7 +346,9 @@ status <- as.integer(outputdata$Survival_Status)
 
 hcccox <- coxph(Surv(time, status)~ factor(Total_IR_Burden), data = outputtable)
 summary(hcccox)
-
+anovatest <- tapply(outputtable$Operative_Time_min, outputtable$Total_IR_Burden, mean, na.rm = TRUE)
+anovamodel <- aov(outputtable$Explant_Necrosis_Percent ~ as.factor(outputtable$Total_IR_Burden))
+dunn.test(outputtable$Tumor_Size_cm, g = as.factor(outputtable$Total_IR_Burden))
 #Kaplan meier curve
 # burden <- subset(outputtable$Total_IR_Burden, outputtable$Total_IR_Burden == 1)
 # survfit2(Surv(time, status) ~ 1, data = outputdata, start.time = 0) |>

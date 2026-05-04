@@ -2,9 +2,10 @@
 #how much basic coding I do not know
 #someone employ this man ASAP
 # Author: Rohan Rathi
-# Date: 3/24/2026
+# Date: 5/3/2026
 # Project: HCC
-# Uses HCCcleaned.xlsx to build survival curves for the project.
+# Uses HCCcleaned.xlsx to build survival curves for the project. NB: If JVIR gets mad about 
+# us not checking collinear
 library(ggplot2)
 library(dplyr, warn.conflicts = FALSE)
 library(readxl)
@@ -91,10 +92,29 @@ time[is.na(time)] <- last_fusurvcurve[is.na(time)]
 outputtable$Survival_Status[outputtable$Survival_Status == "Yes"] <- "0"
 outputtable$Survival_Status[outputtable$Survival_Status == "No"] <- "1"
 status <- as.integer(outputtable$Survival_Status)
+outputtable$Total_IR_Burden <- factor(outputtable$Total_IR_Burden)
 
-
-hcccox <- coxph(Surv(time, status)~ factor(outputtable$Total_IR_Burden), data = outputtable)
+hcccox <- coxph(Surv(time, status)~ Total_IR_Burden + Age + ALT + MELD_Score
+                + Tumor_size + Tumor_Number, data = outputtable)
 summary(hcccox)
+
+library(broom)
+library(car)
+write.csv(tidy(hcccox, exponentiate = TRUE, conf.int = TRUE), "HCCcox_results.csv", row.names = FALSE)
+cox.zph(hcccox)
+
+#To use if they get mad about us not checking correlation enough!!!!
+vif(hcccox)
+library(corrplot)
+num_vars <- outputtable[, c("Age", "ALT", "MELD_Score", "Tumor_size", "Tumor_Number")]
+correlationmatrix <- corrplot(cor(num_vars, use = "complete.obs"), method = "number")
+gtsummary(correlationmatrix)
+library(apaTables)
+apa.cor.table(outputtable[, c("Age", "ALT", "MELD_Score", 
+                              "Tumor_size", "Tumor_Number")],
+              filename = "correlation_table.doc",
+              table.number = 1)
+
 
 Surv(time, status)
 survcurve <- survfit(Surv(time, status)~factor(outputtable$Total_IR_Burden), data = outputtable)
@@ -109,7 +129,6 @@ survfit2(Surv(time, status) ~ outputtable$Total_IR_Burden, data = outputtable, s
     y = "Overall survival"
   ) + 
   theme(legend.position = 'top') +
-  add_confidence_interval() +
   scale_fill_manual(
     values = c("red", "blue", "green"),
     labels = c("No burden", "Single burden", "Multiple burden")
@@ -127,21 +146,12 @@ plot0 <- survfit2(Surv(time[outputtable$Total_IR_Burden==0],
   ggsurvfit() +
   ylim(0,1) +
   labs(
+    title = "No pre-op burden",
     x = "Time (Months)",
     y = "Overall survival",
     tag = "A"
   ) +
-  theme(legend.position = 'top') + 
-  add_confidence_interval() +
-  add_risktable() + 
-  scale_fill_manual(
-    values = c("red", "blue", "green"),
-    labels = c("No burden", "Single burden", "Multiple burden")
-  ) +
-  scale_color_discrete(
-    labels = c("No burden", "Single burden", "Multiple burden")
-  )
-
+  theme(legend.position = 'top') 
 
 plot1 <- survfit2(Surv(time[outputtable$Total_IR_Burden==1], 
                        status[outputtable$Total_IR_Burden==1]) ~ 1, 
@@ -150,20 +160,12 @@ plot1 <- survfit2(Surv(time[outputtable$Total_IR_Burden==1],
     ylim(0,1) +
     coord_cartesian(xlim = c(0, 125)) +
     labs(
+      title = "Single pre-op procedure",
       x = "Time (Months)",
       y = "Overall survival",
       tag = "B"
     ) +
-    theme(legend.position = 'top') + 
-    add_confidence_interval() +
-    add_risktable() + 
-    scale_fill_manual(
-      values = c("red", "blue", "green"),
-      labels = c("No burden", "Single burden", "Multiple burden")
-    ) +
-    scale_color_discrete(
-      labels = c("No burden", "Single burden", "Multiple burden")
-    )
+    theme(legend.position = 'top')
 
 #there is some sapply function that would do my job here without making such a mess of code for a survfit
 #oh well!
@@ -173,18 +175,51 @@ plot2 <- survfit2(Surv(time[outputtable$Total_IR_Burden==2],
   ggsurvfit() +
   ylim(0,1) +
   labs(
+    title = "Multiple pre-op procedures",
     x = "Time (Months)",
     y = "Overall survival",
     tag = "C"
   ) +
-  theme(legend.position = 'top') + 
-  add_confidence_interval() +
-  add_risktable() + 
-  scale_fill_manual(
-    values = c("red", "blue", "green"),
-    labels = c("No burden", "Single burden", "Multiple burden")
-  ) +
-  scale_color_discrete(
-    labels = c("No burden", "Single burden", "Multiple burden")
-  )
+  theme(legend.position = 'top') 
 wrap_plots(A = plot0, B = plot1, C = plot2, design = "AABB\n#CC#")
+
+
+plotTACE <- survfit2(Surv(time[outputtable$TACE_Count==1], 
+                       status[outputtable$TACE_Count==1]) ~ 1, 
+                  data = outputtable[outputtable$TACE_Count==1, ], start.time=0) |>
+  ggsurvfit() +
+  ylim(0,1) +
+  labs(
+    title = "TACE",
+    x = "Time (Months)",
+    y = "Overall survival",
+    tag = "C"
+  ) +
+  theme(legend.position = 'top') 
+
+plotRFA <- survfit2(Surv(time[outputtable$RFA_Count==1], 
+                          status[outputtable$RFA_Count==1]) ~ 1, 
+                     data = outputtable[outputtable$RFA_Count==1, ], start.time=0) |>
+  ggsurvfit() +
+  ylim(0,1) +
+  labs(
+    title = "RFA",
+    x = "Time (Months)",
+    y = "Overall survival",
+    tag = "C"
+  ) +
+  theme(legend.position = 'top')
+
+plotY90 <- survfit2(Surv(time[outputtable$Y90_Count==1], 
+                         status[outputtable$Y90_Count==1]) ~ 1, 
+                    data = outputtable[outputtable$Y90_Count==1, ], start.time=0) |>
+  ggsurvfit() +
+  ylim(0,1) +
+  labs(
+    title = "Y90",
+    x = "Time (Months)",
+    y = "Overall survival",
+    tag = "C"
+  ) +
+  theme(legend.position = 'top')
+wrap_plots(A = plotTACE, B = plotRFA, C = plotY90, design = "AABB\n#CC#")
