@@ -12,7 +12,7 @@ library(cusum)
 library(qcc)
 
 #some nonsense this is wrong
-ICUcases <- read_csv("trimmedcases.csv")
+ICUcases <- read_excel("Master ICU Data Final.xlsx")
 #trim down ICUcases
 trimmedcases <- ICUcases %>%
   filter(!is.na(Patient) & Patient != ""& Patient != " ")
@@ -23,7 +23,7 @@ trimmedcases$Gender[trimmedcases$Gender == "M?"] <- "M"
 write.xlsx(trimmedcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/trimmedcases.xlsx", 
            sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
 
-#Calculates SIRS score and whether sepsis is suspected
+#Calculates SIRS, qSOFA, and UVA score and whether sepsis is suspected
 ICUcases <- ICUcases %>%
   mutate(SIRS = 
            # Temp criterion
@@ -42,7 +42,20 @@ ICUcases <- ICUcases %>%
            (suppressWarnings(as.numeric(SBP) <= 100) %in% TRUE) +
            # RR criterion
            (suppressWarnings(as.numeric(RR) >= 22) %in% TRUE),
-         'High Risk Sepsis' = ifelse(qSOFA >= 2, "Yes", "No"))
+         'High Risk Sepsis' = ifelse(qSOFA >= 2, "Yes", "No"),
+         UVAScore = 
+           # SBP criterion
+           (suppressWarnings(as.numeric(SBP) <= 90) %in% TRUE) + 
+           # RR criterion
+           (suppressWarnings(as.numeric(RR) >= 30) %in% TRUE) +
+           # GCS criterion
+           (suppressWarnings(as.numeric(GCS) < 15) %in% TRUE)*4 + 
+           #Temp
+           (suppressWarnings(as.numeric(Temp) < 36) %in% TRUE)*2 +
+           # pO2 criterion
+           (suppressWarnings(as.numeric(pO2) < 92) %in% TRUE)*2 +
+           # 
+         )
 
 #Removing empty columns and rows
 ICUcases <- ICUcases %>%
@@ -66,7 +79,7 @@ sepsis_patients <- sepsis_patients[-c(104,105),]
 
 #adds sepsis score to the trimmed cases
 trimmedcases$SepsisT <- sepsis_patients$sepsis_suspected
-
+trimmedcases$Age <- as.integer(trimmedcases$Age)
 trimmedcases %>%
   select(Age, Gender,`District.of.Origin`, sepsis, 'High.Risk.Sepsis') %>% 
   tbl_summary(label = list(

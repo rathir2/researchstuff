@@ -5,14 +5,13 @@
 # Date: 5/3/2026
 # Project: HCC
 # Uses HCCcleaned.xlsx to build survival curves for the project. NB: If JVIR gets mad about 
-# us not checking collinear
+# us not checking collinear use lines 106 onwards
 library(ggplot2)
 library(dplyr, warn.conflicts = FALSE)
 library(readxl)
 library(tidyverse)
 library(gtsummary)
 library(xlsx)
-library("survival")
 library("survminer",warn.conflicts = FALSE)
 library("Rcpp")
 library('gt')
