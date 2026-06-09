@@ -12,12 +12,15 @@ library("Rcpp")
 library('gt')
 library(survival)
 
-ICUcases <- read_csv("trimmedcases.csv")
 
-trimmedcases <- read.xlsx("ICUcases_w_sepsis.xlsx", 1)
+#has trimmed data with sepsis info by patient.
+cases <- read.csv("ICUcases_day0_scores.csv")
+
 
 #adds sepsis score to the trimmed cases
-trimmedcases$SepsisT <- sepsis_patients$sepsis_suspected
+#trimmedcases$SepsisT <- sepsis_patients$sepsis_suspected
+
+ICUcases$Age <- as.integer(ICUcases$Age)
 trimmedcases$Age <- as.integer(trimmedcases$Age)
 trimmedcases %>%
   select(Age, Gender,`District.of.Origin`, sepsis, 'High.Risk.Sepsis', UVAScore, Outcome) %>% 
@@ -29,13 +32,14 @@ trimmedcases %>%
   ) |>
   modify_header(label~"**Donor Characteristics**")
 #adding survival status
-trimmedcases$status <- trimmedcases$Outcome
-trimmedcases$status[trimmedcases$status == "death"] <- 1
-trimmedcases$status[trimmedcases$status == "downgraded"] <- 0
-trimmedcases$status[trimmedcases$status == "transferred to outside hospital"] <- 0
-trimmedcases$status[trimmedcases$status == "unspecified"] <- 0
-trimmedcases$status <- as.numeric(trimmedcases$status)
-trimmedcases$time <- trimmedcases$Length.of.stay
+#this version changed trimmedcases to ICUcases.
+ICUcases$status <- ICUcases$Outcome
+ICUcases$status[ICUcases$status == "death"] <- 1
+ICUcases$status[ICUcases$status == "downgraded"] <- 0
+ICUcases$status[ICUcases$status == "transferred to outside hospital"] <- 0
+ICUcases$status[ICUcases$status == "unspecified"] <- 0
+ICUcases$status <- as.numeric(ICUcases$status)
+ICUcases$time <- ICUcases$Length.of.stay
 
 #Kaplan Meier
 survfit2(Surv(time, status) ~ UVAScore, data = trimmedcases, start.time = 0) |>
@@ -92,3 +96,13 @@ qsofacox <- coxph(Surv(time, status)~ qSOFA, data = trimmedcases)
 
 hcccox <- coxph(Surv(time, status)~ Total_IR_Burden + Age + ALT + MELD_Score
                 + Tumor_size + Tumor_Number, data = outputtable)
+
+UVAcomp <- list((suppressWarnings(as.numeric(trimmedcases$SBP) <= 90) %in% TRUE), 
+  (suppressWarnings(as.numeric(trimmedcases$RR) >= 30) %in% TRUE),
+  (suppressWarnings(as.numeric(trimmedcases$GCS) < 15) %in% TRUE), 
+  (suppressWarnings(as.numeric(trimmedcases$Temp) < 36) %in% TRUE),
+  (suppressWarnings(as.numeric(trimmedcases$pO2) < 92) %in% TRUE))
+for(i in 1:5){
+  coxph(Surv(time, status) ~ UVAcomp[i])
+}
+  
