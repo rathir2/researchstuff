@@ -20,9 +20,9 @@ cases <- read.csv("trimmeddata.csv")
 #adds sepsis score to the trimmed cases
 #trimmedcases$SepsisT <- sepsis_patients$sepsis_suspected
 
-ICUcases$Age <- as.integer(ICUcases$Age)
-trimmedcases$Age <- as.integer(trimmedcases$Age)
-trimmedcases %>%
+cases$Age <- as.integer(cases$Age)
+#fix with Day 0
+cases %>%
   select(Age, Gender,`District.of.Origin`, sepsis, 'High.Risk.Sepsis', UVAScore, Outcome) %>% 
   tbl_summary(label = list(
     Age = "Age, median (range), years",
@@ -33,16 +33,16 @@ trimmedcases %>%
   modify_header(label~"**Donor Characteristics**")
 #adding survival status
 #this version changed trimmedcases to ICUcases.
-ICUcases$status <- ICUcases$Outcome
-ICUcases$status[ICUcases$status == "death"] <- 1
-ICUcases$status[ICUcases$status == "downgraded"] <- 0
-ICUcases$status[ICUcases$status == "transferred to outside hospital"] <- 0
-ICUcases$status[ICUcases$status == "unspecified"] <- 0
-ICUcases$status <- as.numeric(ICUcases$status)
-ICUcases$time <- ICUcases$Length.of.stay
+cases$status <- cases$Outcome
+cases$status[cases$status == "death"] <- 1
+cases$status[cases$status == "downgraded"] <- 0
+cases$status[cases$status == "transferred to outside hospital"] <- 0
+cases$status[cases$status == "unspecified"] <- 0
+cases$status <- as.numeric(cases$status)
+cases$time <- as.numeric(cases$Length.of.stay)
 
 #Kaplan Meier
-survfit2(Surv(time, status) ~ UVAScore, data = trimmedcases, start.time = 0) |>
+survfit2(Surv(time, status) ~ UVAScore_day0, data = cases, start.time = 0) |>
   ggsurvfit() +
   ylim(0,1) +
   labs(
@@ -58,7 +58,24 @@ survfit2(Surv(time, status) ~ UVAScore, data = trimmedcases, start.time = 0) |>
     labels = c("UVA score 0", "UVA Score 1", "UVA score 2", "UVA score 3", "UVA score 4")
   )
 
-survfit2(Surv(time, status) ~ SIRS, data = trimmedcases, start.time = 0) |>
+#figure out a way to make this work without having all the NAs
+survfit2(Surv(time, status) ~ UVAScore_day3, data = cases, start.time = 0) |>
+  ggsurvfit() +
+  ylim(0,1) +
+  labs(
+    x = "Time (Days)",
+    y = "Overall survival"
+  ) + 
+  theme(legend.position = 'top') +
+  scale_fill_manual(
+    values = c("red", "blue", "green", "yellow", "black"),
+    labels = c("UVA score 0", "UVA Score 1", "UVA score 2", "UVA score 3", "UVA score 4")
+  ) +
+  scale_color_discrete(
+    labels = c("UVA score 0", "UVA Score 1", "UVA score 2", "UVA score 3", "UVA score 4")
+  )
+
+survfit2(Surv(time, status) ~ SIRS_day0, data = cases, start.time = 0) |>
   ggsurvfit() +
   ylim(0,1) +
   labs(
@@ -84,9 +101,11 @@ trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 31 |
 
 trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 50 ] <- "Very-long"
 
-UVAcox <- coxph(Surv(time, status)~ UVAScore, data = trimmedcases)
+UVAd0 <- coxph(Surv(time, status)~ UVAScore_day0, data = cases)
 
-SIRScox <- coxph(Surv(time, status)~ SIRS, data = trimmedcases)
+SIRSd0 <- coxph(Surv(time, status)~ SIRS_day0, data = cases)
+
+UVAd0m <- coxph(Surv(time, status) ~ UVAScore_day0 + Age + Creatinine..mg.dL., data = cases)
 
 distancecox <- coxph(Surv(time, status)~ distance, data = trimmedcases)
 

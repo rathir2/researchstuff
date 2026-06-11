@@ -31,7 +31,7 @@ day3_vals <- df %>%
 df_out <- df %>%
   left_join(day0_vals, by = "patient_group") %>%
   left_join(day3_vals, by = "patient_group") %>%
-  select(-patient_group)           # drop the helper column
+  select(-patient_group, -cols)           # drop the helper column
 
 # ── Result ─────────────────────────────────────────────────────────────────────
 # df_out now has 10 new columns populated on every row for a patient,

@@ -6,13 +6,14 @@ library(ggplot2)
 library(dplyr)
 library(readxl)
 library(xlsx)
+library(writexl)
 library(tidyverse)
 library(gtsummary)
 library(cusum)
 library(qcc)
 
 
-ICUcases <- read_excel("Master ICU Data Final.xlsx")
+ICUcases <- read_excel("ICUcases_w_sepsis.xlsx")
 #trim down ICUcases
 #trimmedcases <- ICUcases %>%
  # filter(!is.na(Patient) & Patient != ""& Patient != " ")
@@ -107,8 +108,9 @@ ICUcases <- ICUcases %>%
   filter(!is.na(Day) & Day != "")
 
 
-write.xlsx(ICUcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/ICUcases_w_sepsis.xlsx", 
-           sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
+#write.xlsx(ICUcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/ICUcases_w_sepsis.xlsx", 
+#           sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
+write_xlsx(ICUcases,"/home/rrathi02/ICU/ICUcases_w_sepsis.xlsx")
 trimmedcases <- read.xlsx("ICUcases_w_sepsis.xlsx", 1)
 
 #summarizes the ICU cases by whether a patient had sepsis suspected during their time.
