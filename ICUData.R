@@ -11,19 +11,19 @@ library(gtsummary)
 library(cusum)
 library(qcc)
 
-#some nonsense this is wrong
+
 ICUcases <- read_excel("Master ICU Data Final.xlsx")
 #trim down ICUcases
-trimmedcases <- ICUcases %>%
-  filter(!is.na(Patient) & Patient != ""& Patient != " ")
-trimmedcases <- trimmedcases[trimmedcases$Patient != trimmedcases$Patient[61],]
+#trimmedcases <- ICUcases %>%
+ # filter(!is.na(Patient) & Patient != ""& Patient != " ")
+#trimmedcases <- trimmedcases[trimmedcases$Patient != trimmedcases$Patient[61],]
 
-trimmedcases$Age <- as.numeric(trimmedcases$Age)
-trimmedcases$Gender[trimmedcases$Gender == "M?"] <- "M"
-write.xlsx(trimmedcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/trimmedcases.xlsx", 
-           sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
+#trimmedcases$Age <- as.numeric(trimmedcases$Age)
+#trimmedcases$Gender[trimmedcases$Gender == "M?"] <- "M"
+#write.xlsx(trimmedcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/trimmedcases.xlsx", 
+ #          sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
 
-#Calculates SIRS, qSOFA, and UVA score and whether sepsis is suspected
+#Calculates SIRS, qSOFA, UVA, suspected sepsis, and MEWS
 ICUcases <- ICUcases %>%
   mutate(SIRS = 
            # Temp criterion
@@ -53,8 +53,51 @@ ICUcases <- ICUcases %>%
            #Temp
            (suppressWarnings(as.numeric(Temp) < 36) %in% TRUE)*2 +
            # pO2 criterion
-           (suppressWarnings(as.numeric(pO2) < 92) %in% TRUE)*2 +
-           # 
+           (suppressWarnings(as.numeric(pO2) < 92) %in% TRUE)*2,
+         MEWS =
+           # SBP criterion
+           case_when(
+             suppressWarnings(as.numeric(SBP) <= 70)                                        ~ 3,
+             suppressWarnings(as.numeric(SBP) >= 71)  & as.numeric(SBP) <= 80              ~ 2,
+             suppressWarnings(as.numeric(SBP) >= 81)  & as.numeric(SBP) <= 100             ~ 1,
+             suppressWarnings(as.numeric(SBP) >= 101) & as.numeric(SBP) <= 199             ~ 0,
+             suppressWarnings(as.numeric(SBP) >= 200)                                       ~ 2,
+             TRUE ~ 0
+           ) +
+           # HR criterion
+           case_when(
+             suppressWarnings(as.numeric(HR) < 40)                                          ~ 2,
+             suppressWarnings(as.numeric(HR) >= 40)  & as.numeric(HR) <= 50                ~ 1,
+             suppressWarnings(as.numeric(HR) >= 51)  & as.numeric(HR) <= 100               ~ 0,
+             suppressWarnings(as.numeric(HR) >= 101) & as.numeric(HR) <= 110               ~ 1,
+             suppressWarnings(as.numeric(HR) >= 111) & as.numeric(HR) <= 129               ~ 2,
+             suppressWarnings(as.numeric(HR) >= 130)                                        ~ 3,
+             TRUE ~ 0
+           ) +
+           # RR criterion
+           case_when(
+             suppressWarnings(as.numeric(RR) < 9)                                           ~ 2,
+             suppressWarnings(as.numeric(RR) >= 9)  & as.numeric(RR) <= 14                 ~ 0,
+             suppressWarnings(as.numeric(RR) >= 15) & as.numeric(RR) <= 20                 ~ 1,
+             suppressWarnings(as.numeric(RR) >= 21) & as.numeric(RR) <= 29                 ~ 2,
+             suppressWarnings(as.numeric(RR) >= 30)                                         ~ 3,
+             TRUE ~ 0
+           ) +
+           # Temp criterion
+           case_when(
+             suppressWarnings(as.numeric(Temp) < 35)                                        ~ 2,
+             suppressWarnings(as.numeric(Temp) >= 35)   & as.numeric(Temp) <= 38.4         ~ 0,
+             suppressWarnings(as.numeric(Temp) >= 38.5)                                     ~ 2,
+             TRUE ~ 0
+           ) +
+           # Neurological criterion (mapped from GCS)
+           case_when(
+             suppressWarnings(as.numeric(GCS) == 15)                                        ~ 0,  # Alert
+             suppressWarnings(as.numeric(GCS) >= 12) & as.numeric(GCS) <= 14               ~ 1,  # Voice
+             suppressWarnings(as.numeric(GCS) >= 9)  & as.numeric(GCS) <= 11               ~ 2,  # Pain
+             suppressWarnings(as.numeric(GCS) <= 8)                                         ~ 3,  # Unresponsive
+             TRUE ~ 0
+           ) 
          )
 
 #Removing empty columns and rows
