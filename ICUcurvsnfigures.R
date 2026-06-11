@@ -14,7 +14,7 @@ library(survival)
 
 
 #has trimmed data with sepsis info by patient.
-cases <- read.csv("ICUcases_day0_scores.csv")
+cases <- read.csv("trimmeddata.csv")
 
 
 #adds sepsis score to the trimmed cases
