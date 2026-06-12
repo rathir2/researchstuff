@@ -14,7 +14,7 @@ library(qcc)
 
 
 ICUcases <- read_excel("ICUcases_w_sepsis.xlsx")
-#trim down ICUcases
+#trim down ICUcases-found a better way to do this.
 #trimmedcases <- ICUcases %>%
  # filter(!is.na(Patient) & Patient != ""& Patient != " ")
 #trimmedcases <- trimmedcases[trimmedcases$Patient != trimmedcases$Patient[61],]
@@ -107,10 +107,10 @@ ICUcases <- ICUcases %>%
 ICUcases <- ICUcases %>% 
   filter(!is.na(Day) & Day != "")
 
-
-#write.xlsx(ICUcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/ICUcases_w_sepsis.xlsx", 
-#           sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
-write_xlsx(ICUcases,"/home/rrathi02/ICU/ICUcases_w_sepsis.xlsx")
+#because i'm working on two computers, having to switch back and forth here. not great
+write.xlsx(ICUcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/ICUcases_w_sepsis.xlsx", 
+          sheetName = "Sheet1", row.names = TRUE, append = FALSE) 
+#write_xlsx(ICUcases,"/home/rrathi02/ICU/ICUcases_w_sepsis.xlsx")
 trimmedcases <- read.xlsx("ICUcases_w_sepsis.xlsx", 1)
 
 #summarizes the ICU cases by whether a patient had sepsis suspected during their time.

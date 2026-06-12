@@ -17,20 +17,14 @@ library(survival)
 cases <- read.csv("trimmeddata.csv")
 
 
+#data with cases with daily metrics
+dailycases <- read_excel("ICUcases_w_sepsis.xlsx")
 #adds sepsis score to the trimmed cases
 #trimmedcases$SepsisT <- sepsis_patients$sepsis_suspected
 
 cases$Age <- as.integer(cases$Age)
 #fix with Day 0
-cases %>%
-  select(Age, Gender,`District.of.Origin`, sepsis, 'High.Risk.Sepsis', UVAScore, Outcome) %>% 
-  tbl_summary(label = list(
-    Age = "Age, median (range), years",
-    Gender = "Sex, No. (%)",
-    `District of Origin` = "District of Residence"
-  )
-  ) |>
-  modify_header(label~"**Donor Characteristics**")
+
 #adding survival status
 #this version changed trimmedcases to ICUcases.
 cases$status <- cases$Outcome
@@ -40,6 +34,31 @@ cases$status[cases$status == "transferred to outside hospital"] <- 0
 cases$status[cases$status == "unspecified"] <- 0
 cases$status <- as.numeric(cases$status)
 cases$time <- as.numeric(cases$Length.of.stay)
+cases$WBC <- as.numeric(cases$WBC)
+cases$Hgb <- as.numeric(cases$Hgb)
+cases <- cases %>%
+  mutate(across(everything(), ~if_else(. == "PEND", NA,.)))
+
+trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. < 15 ] <- "Short"
+
+trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 15 | 
+                        trimmedcases$Distance.to.Butare..mi. < 31 ] <- "Medium"
+
+trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 31 | 
+                        trimmedcases$Distance.to.Butare..mi. < 50 ] <- "Medium-long"
+
+trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 50 ] <- "Very-long"
+
+
+cases %>%
+  select(Age, Gender,`District.of.Origin`, sepsis, 'High.Risk.Sepsis', UVAScore, Outcome) %>% 
+  tbl_summary(label = list(
+    Age = "Age, median (range), years",
+    Gender = "Sex, No. (%)",
+    `District of Origin` = "District of Residence"
+  )
+  ) |>
+  modify_header(label~"**Donor Characteristics**")
 
 #Kaplan Meier
 survfit2(Surv(time, status) ~ UVAScore_day0, data = cases, start.time = 0) |>
@@ -91,31 +110,9 @@ survfit2(Surv(time, status) ~ SIRS_day0, data = cases, start.time = 0) |>
     labels = c("Sirs score 0", "Sirs Score 1", "Sirs score 2", "Sirs score 3", "Sirs score 4")
   )
 
-trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. < 15 ] <- "Short"
 
-trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 15 | 
-                        trimmedcases$Distance.to.Butare..mi. < 31 ] <- "Medium"
 
-trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 31 | 
-                        trimmedcases$Distance.to.Butare..mi. < 50 ] <- "Medium-long"
-
-trimmedcases$distance[trimmedcases$Distance.to.Butare..mi. > 50 ] <- "Very-long"
-
-UVAd0 <- coxph(Surv(time, status)~ UVAScore_day0, data = cases)
-
-SIRSd0 <- coxph(Surv(time, status)~ SIRS_day0, data = cases)
-
-UVAd0m <- coxph(Surv(time, status) ~ UVAScore_day0 + Age + Creatinine..mg.dL., data = cases)
-
-distancecox <- coxph(Surv(time, status)~ distance, data = trimmedcases)
-
-agecox <- coxph(Surv(time, status)~ Age, data = trimmedcases)
-
-qsofacox <- coxph(Surv(time, status)~ qSOFA, data = trimmedcases)
-
-hcccox <- coxph(Surv(time, status)~ Total_IR_Burden + Age + ALT + MELD_Score
-                + Tumor_size + Tumor_Number, data = outputtable)
-
+#what the actual fuck was i trying to do here.
 UVAcomp <- list((suppressWarnings(as.numeric(trimmedcases$SBP) <= 90) %in% TRUE), 
   (suppressWarnings(as.numeric(trimmedcases$RR) >= 30) %in% TRUE),
   (suppressWarnings(as.numeric(trimmedcases$GCS) < 15) %in% TRUE), 
