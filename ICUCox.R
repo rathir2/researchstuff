@@ -34,21 +34,16 @@ cases$Hgb <- as.numeric(cases$Hgb)
 cases <- cases %>%
   mutate(across(everything(), ~if_else(. == "PEND", NA,.)))
 
-dailycases <- dailycases %>%
-#  mutate(Patient = na_if(Patient, "")) %>%  # convert "" to NA first
-  fill(Patient, .direction = "down") %>%
-  mutate(Patient = as.numeric(Patient))
 
-#check work
-dailycases %>%
-  group_by(Patient) %>%
-  summarise(
-    days      = n(),
-    min_day   = min(Day),
-    max_day   = max(Day),
-    any_na_pt = anyNA(Patient)
-  ) %>%
-  print(n = Inf)
+dailycases <- dailycases %>% 
+  fill(Patient, .direction = "down") %>%
+  fill(Gender, .direction = "down") %>%
+  fill(Age, .direction = "down") %>%
+  mutate(Patient = as.numeric(Patient)) %>%
+  mutate(Age = as.numeric(Age)) %>%
+  mutate(Vasopressors = if_else(is.na(Vasopressors), "N", Vasopressors)) %>%
+  mutate(Vasopressors = factor(Vasopressors, levels = c("N", "Y")))
+
 
 dailycases_tv <- dailycases %>%
   arrange(Patient, Day) %>%
@@ -67,42 +62,57 @@ dailycases_tv <- dailycases %>%
     
   ) %>%
   ungroup() 
-  
+
+write.csv(dailycases_tv,"ICUCOXdata.csv", row.names = FALSE)
 # Check a patient who died
-dailycases_tv %>%
-  filter(Patient == 80) %>%          # swap in a known death
-  select(Patient, Day, t.start, t.stop, event, Outcome)
+# dailycases_tv %>%
+#   filter(Patient == 80) %>%          # swap in a known death
+#   select(Patient, Day, t.start, t.stop, event, Outcome)
 
 # Confirm each patient has exactly 0 or 1 events
-dailycases_tv %>%
-  group_by(Patient) %>%
-  summarise(total_events = sum(event), outcome = first(Outcome)) %>%
-  count(total_events, outcome)
+# dailycases_tv %>%
+#   group_by(Patient) %>%
+#   summarise(total_events = sum(event), outcome = first(Outcome)) %>%
+#   count(total_events, outcome)
 # Deaths should all have total_events == 1
 # Survivors should all have total_events == 0
 
-UVAd0 <- coxph(Surv(time, status)~ UVAScore_day0, data = cases)
-
-SIRSd0 <- coxph(Surv(time, status)~ SIRS_day0, data = cases)
-
-cox_UVA <- coxph(Surv(time, status) ~ UVAScore_day0 + Age + Creatinine..mg.dL.
-                + data = cases)
-
+#can't do vasopressors because missingness
+dailycases_tv$UVAsuspected <- ifelse(dailycases_tv$UVAScore >= 4, "Suspected", "No")
 cox_MEWS <- coxph(
   Surv(t.start, t.stop, event) ~ 
-    MEWS + Age + Gender + `Creatinine (mg/dL)`,
+    MEWS + Age + Gender,
   data    = dailycases_tv,
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
 
-cox_MEWS <- coxph(
+cox_qsofa <- coxph(
   Surv(t.start, t.stop, event) ~ 
-    MEWS,
+    qSOFA + Age + Gender,
   data    = dailycases_tv,
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
+
+cox_UVA <- coxph(
+  Surv(t.start, t.stop, event) ~ 
+    UVAScore + Age + Gender,
+  data    = dailycases_tv,
+  id      = Patient,       # tells R which rows belong to same patient
+  cluster = Patient        # robust SE to account for within-patient correlation
+)
+
+cox_SIRS <- coxph(
+  Surv(t.start, t.stop, event) ~ 
+    SIRS + Age + Gender,
+  data    = dailycases_tv,
+  id      = Patient,       # tells R which rows belong to same patient
+  cluster = Patient        # robust SE to account for within-patient correlation
+)
+
+sapply(list(MEWS = cox_MEWS, qSOFA = cox_qsofa, SIRS = cox_SIRS, UVA = cox_UVA),
+       function(m) summary(m)$concordance)
 
 distancecox <- coxph(Surv(time, status)~ distance, data = trimmedcases)
 
@@ -110,9 +120,15 @@ agecox <- coxph(Surv(time, status)~ Age, data = trimmedcases)
 
 qsofacox <- coxph(Surv(time, status)~ qSOFA, data = trimmedcases)
 
-hcccox <- coxph(Surv(time, status)~ Total_IR_Burden + Age + ALT + MELD_Score
-                + Tumor_size + Tumor_Number, data = outputtable)
+nrow(dailycases_tv)
 
-
-
-
+# Check missingness for each model variable across ALL rows
+dailycases_tv %>%
+  summarise(
+    total_rows = n(),
+    MEWS_na    = sum(is.na(MEWS)),
+    Age_na     = sum(is.na(Age)),
+    event_na   = sum(is.na(event)),
+    tstart_na  = sum(is.na(t.start)),
+    tstop_na   = sum(is.na(t.stop))
+  )

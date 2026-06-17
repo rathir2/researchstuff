@@ -50,7 +50,9 @@ ICUcases <- ICUcases %>%
            # RR criterion
            (suppressWarnings(as.numeric(RR) >= 30) %in% TRUE) +
            # GCS criterion
-           (suppressWarnings(as.numeric(GCS) < 15) %in% TRUE)*4 + 
+           (suppressWarnings(as.numeric(GCS) < 15) %in% TRUE)*4 +
+           # HR criterion
+           (suppressWarnings(as.numeric(HR) >= 120) %in% TRUE) +
            #Temp
            (suppressWarnings(as.numeric(Temp) < 36) %in% TRUE)*2 +
            # pO2 criterion
@@ -101,11 +103,14 @@ ICUcases <- ICUcases %>%
            ) 
          )
 
+bs <- ICUcases$Patient[681]
+
 #Removing empty columns and rows
 ICUcases <- ICUcases %>%
-  select(-matches("^\\.{3}\\d{3}$"))
-ICUcases <- ICUcases %>% 
-  filter(!is.na(Day) & Day != "")
+  select(-matches("^\\.{3}\\d{3}$")) %>% 
+  filter(!is.na(Day) & Day != "") %>%
+  #CRUCIAL! Weird unicode characters riddle this dataset. This line fixes them.
+  mutate(across(everything(), ~if_else(. == bs, NA,.)))
 
 #because i'm working on two computers, having to switch back and forth here. not great
 write.xlsx(ICUcases,"C:/Users/rrath/Desktop/med school stuff/OrganCraftCrew/rwanda/ICUcases_w_sepsis.xlsx", 
@@ -134,3 +139,4 @@ trimmedcases %>%
   )
   ) |>
   modify_header(label~"**Donor Characteristics**")
+
