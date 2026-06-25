@@ -2,13 +2,15 @@
 #Output: Case data where each patient has a single row and Day 0 and 3 sepsis data is added.
 
 library(readxl)
+library(openxlsx)
 library(dplyr)
 
 # ── Load data ──────────────────────────────────────────────────────────────────
 df <- read_excel("ICUcases_w_sepsis.xlsx")
 
 # ── Columns to move from Day 3 → Day 0 ────────────────────────────────────────
-cols <- c("SIRS", "sepsis", "qSOFA", "High Risk Sepsis", "UVAScore", "MEWS")
+cols <- c("SIRS", "qSOFA", "High Risk Sepsis", "UVAScore", "MEWS", "NEWS", 'SIRSsuspected',  
+          'UVAgroup', 'qSOFAgroup', 'MEWSgroup', 'NEWSgroup')
 
 # ── Assign a patient group ID ──────────────────────────────────────────────────
 # Patient ID appears only on Day 0 rows; all subsequent rows have NA.
@@ -30,8 +32,9 @@ day3_vals <- df %>%
 # ── Join Day 0,3 values onto the Day 0 rows ─────────────────────────────────────
 df_out <- df %>%
   left_join(day0_vals, by = "patient_group") %>%
-  left_join(day3_vals, by = "patient_group") %>%
-  select(-patient_group, -cols)           # drop the helper column
+  left_join(day3_vals, by = "patient_group") 
+# %>%
+#  select(-patient_group, -cols)           # drop the helper column
 
 # ── Result ─────────────────────────────────────────────────────────────────────
 # df_out now has 10 new columns populated on every row for a patient,
@@ -44,5 +47,5 @@ trimmeddata <- df_out %>% filter(Day == 0)
 # write.csv(df_out,      "ICUcases_with_day3_scores.csv",      row.names = FALSE)
 
 # One-row-per-patient (Day 0 only)
-write.csv(trimmeddata,   "trimmeddata.csv", row.names = FALSE)
+write.xlsx(trimmeddata,   "trimmeddata.xlsx", sheetName = "Sheet1", rowNames = FALSE, append = FALSE)
 

@@ -24,14 +24,6 @@ library(tidycmprsk)
 library(devtools)
 library(patchwork)
 
-#thank you to dan nedialkov, who spent half an afternoon rewriting my code and telling me
-#how much basic coding I do not know
-#someone get this man a job ASAP
-
-
-#CANNOT HAVE NULL AS REPLACEMENT
-
-
 
 outputtable <- read_xlsx("NewData.xlsx")
 #remove all commas in the service of making everything that needs to be numeric numeric

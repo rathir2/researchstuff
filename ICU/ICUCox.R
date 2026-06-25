@@ -78,10 +78,10 @@ write.csv(dailycases_tv,"ICUCOXdata.csv", row.names = FALSE)
 # Survivors should all have total_events == 0
 
 #can't do vasopressors because missingness
-dailycases_tv$UVAsuspected <- ifelse(dailycases_tv$UVAScore >= 4, "Suspected", "No")
+
 cox_MEWS <- coxph(
   Surv(t.start, t.stop, event) ~ 
-    MEWS + Age + Gender,
+    MEWSgroup + Age + Gender,
   data    = dailycases_tv,
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
@@ -89,7 +89,7 @@ cox_MEWS <- coxph(
 
 cox_qsofa <- coxph(
   Surv(t.start, t.stop, event) ~ 
-    qSOFA + Age + Gender,
+    qSOFAgroup + Age + Gender,
   data    = dailycases_tv,
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
@@ -97,7 +97,7 @@ cox_qsofa <- coxph(
 
 cox_UVA <- coxph(
   Surv(t.start, t.stop, event) ~ 
-    UVAScore + Age + Gender,
+    UVAgroup + Age + Gender,
   data    = dailycases_tv,
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
@@ -105,7 +105,15 @@ cox_UVA <- coxph(
 
 cox_SIRS <- coxph(
   Surv(t.start, t.stop, event) ~ 
-    SIRS + Age + Gender,
+    SIRSsuspected + Age + Gender,
+  data    = dailycases_tv,
+  id      = Patient,       # tells R which rows belong to same patient
+  cluster = Patient        # robust SE to account for within-patient correlation
+)
+
+cox_NEWS <- coxph(
+  Surv(t.start, t.stop, event) ~ 
+    NEWSgroup + Age + Gender,
   data    = dailycases_tv,
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
