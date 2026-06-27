@@ -10,7 +10,7 @@ df <- read_excel("ICUcases_w_sepsis.xlsx")
 
 # ── Columns to move from Day 3 → Day 0 ────────────────────────────────────────
 cols <- c("SIRS", "qSOFA", "High Risk Sepsis", "UVAScore", "MEWS", "NEWS", 'SIRSsuspected',  
-          'UVAgroup', 'qSOFAgroup', 'MEWSgroup', 'NEWSgroup')
+          'UVAgroup', 'UVAgroup2','qSOFAgroup', 'MEWSgroup', 'NEWSgroup')
 
 # ── Assign a patient group ID ──────────────────────────────────────────────────
 # Patient ID appears only on Day 0 rows; all subsequent rows have NA.

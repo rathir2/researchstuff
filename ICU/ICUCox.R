@@ -7,13 +7,13 @@ library(readxl)
 library(xlsx)
 library(tidyverse)
 library(gtsummary)
-library(cusum)
-library(qcc)
 library(ggsurvfit)
 library("survminer",warn.conflicts = FALSE)
 library("Rcpp")
 library('gt')
 library(survival)
+library(flextable)
+
 
 #has trimmed data with sepsis info by patient.
 cases <- read.csv("trimmeddata.csv")
@@ -61,9 +61,33 @@ dailycases_tv <- dailycases %>%
     t.stop  = Day + 1 #because day 0 is the first day
     
   ) %>%
-  ungroup() 
+  ungroup() %>%
+  mutate(
+    status = case_when(
+      Outcome == "death" ~ 1,
+      Outcome == "downgraded" ~ 0,
+      Outcome == "transferred to outside hospital" ~ 0,
+      Outcome == "unspecified" ~ 0
+    )
+  )
+
+patient_data <- dailycases_tv %>%
+  group_by(Patient) %>%
+  summarise(
+    MEWS     = max(MEWS,      na.rm = TRUE),
+    qSOFA    = max(qSOFA,     na.rm = TRUE),
+    SIRS     = max(SIRS,      na.rm = TRUE),
+    UVAScore = max(UVAScore,  na.rm = TRUE),
+    NEWS     = max(NEWS,      na.rm = TRUE),
+    died     = max(event,     na.rm = TRUE),
+    Age = first(Age[Day == 0]),
+    Gender = first(Gender[Day == 0]),
+    .groups = "drop"
+  )
+
 
 write.csv(dailycases_tv,"ICUCOXdata.csv", row.names = FALSE)
+write.xlsx(patient_data, "trimmedLOGdata.xlsx", rowNames = FALSE)
 # Check a patient who died
 # dailycases_tv %>%
 #   filter(Patient == 80) %>%          # swap in a known death
@@ -86,6 +110,36 @@ cox_MEWS <- coxph(
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
+MEWS_ph_test <- cox.zph(cox_MEWS)
+
+log_MEWS <- glm(status ~ MEWSgroup + Age + Gender, 
+                family = binomial(link = 'logit'), 
+                data = dailycases_tv)
+log_MEWS %>%
+  tbl_regression(exponentiate = TRUE)
+
+# Pseudo R-squared
+pR2(log_MEWS)
+
+# Hosmer-Lemeshow goodness of fit
+hoslem.test(dailycases_tv$status, fitted(log_MEWS))
+
+roc_obj <- roc(dailycases_tv$status, fitted(log_MEWS))
+auc(roc_obj)
+plot(roc_obj,
+     print.auc = TRUE,          # adds AUC to the plot
+     auc.polygon = TRUE,        # shades the area under the curve
+     grid = TRUE,
+     col = "blue",
+     main = "ROC Curve - Logistic Regression")
+
+tidy(cox_MEWS, exponentiate = TRUE, conf.int = TRUE) |>
+  ggplot(aes(x = estimate, y = term, xmin = conf.low, xmax = conf.high)) +
+  geom_pointrange() +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_log10() +
+  labs(x = "Hazard Ratio", y = NULL) +
+  theme_minimal()
 
 cox_qsofa <- coxph(
   Surv(t.start, t.stop, event) ~ 
@@ -94,6 +148,7 @@ cox_qsofa <- coxph(
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
+qsofa_ph_test <- cox.zph(cox_qsofa)
 
 cox_UVA <- coxph(
   Surv(t.start, t.stop, event) ~ 
@@ -102,6 +157,16 @@ cox_UVA <- coxph(
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
+UVA_ph_test <- cox.zph(cox_UVA)
+
+cox_UVA2 <- coxph(
+  Surv(t.start, t.stop, event) ~ 
+    UVAgroup2 + Age + Gender,
+  data    = dailycases_tv,
+  id      = Patient,       # tells R which rows belong to same patient
+  cluster = Patient        # robust SE to account for within-patient correlation
+)
+UVA_ph_test <- cox.zph(cox_UVA2)
 
 cox_SIRS <- coxph(
   Surv(t.start, t.stop, event) ~ 
@@ -110,6 +175,7 @@ cox_SIRS <- coxph(
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
+SIRS_ph_test <- cox.zph(cox_SIRS)
 
 cox_NEWS <- coxph(
   Surv(t.start, t.stop, event) ~ 
@@ -118,25 +184,8 @@ cox_NEWS <- coxph(
   id      = Patient,       # tells R which rows belong to same patient
   cluster = Patient        # robust SE to account for within-patient correlation
 )
+NEWS_ph_test <- cox.zph(cox_NEWS)
 
-sapply(list(MEWS = cox_MEWS, qSOFA = cox_qsofa, SIRS = cox_SIRS, UVA = cox_UVA),
+comparemodels <- sapply(list(MEWS = cox_MEWS, qSOFA = cox_qsofa, SIRS = cox_SIRS, UVA = cox_UVA, NEWS = cox_NEWS),
        function(m) summary(m)$concordance)
 
-distancecox <- coxph(Surv(time, status)~ distance, data = trimmedcases)
-
-agecox <- coxph(Surv(time, status)~ Age, data = trimmedcases)
-
-qsofacox <- coxph(Surv(time, status)~ qSOFA, data = trimmedcases)
-
-nrow(dailycases_tv)
-
-# Check missingness for each model variable across ALL rows
-dailycases_tv %>%
-  summarise(
-    total_rows = n(),
-    MEWS_na    = sum(is.na(MEWS)),
-    Age_na     = sum(is.na(Age)),
-    event_na   = sum(is.na(event)),
-    tstart_na  = sum(is.na(t.start)),
-    tstop_na   = sum(is.na(t.stop))
-  )
