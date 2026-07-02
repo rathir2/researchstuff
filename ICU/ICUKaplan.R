@@ -68,23 +68,26 @@ survfit2(Surv(time, status) ~ UVAgroup, data = cases, start.time = 0) |>
   ylim(0,1) +
   labs(
     x = "Time (Days)",
-    y = "Overall survival"
+    y = "Overall survival",
+    title = "Survival by UVA Score"
   ) + 
   theme(legend.position = 'top') +
   scale_fill_manual(
     values = c("red", "blue", "green"),
-    labels = c("Low Risk", "Medium Risk", "High Risk")
+    labels = c("Low Risk (<2)", "Medium Risk (2-4)", "High Risk (>4)")
   ) +
   scale_color_discrete(
-    labels = c("Low Risk", "Medium Risk", "High Risk")
-  )
+    labels = c("Low Risk (<2)", "Medium Risk (2-4)", "High Risk (>4)")
+  ) +
+  add_risktable()
 
 survfit2(Surv(time, status) ~ UVAgroup2, data = cases, start.time = 0) |>
   ggsurvfit() +
   ylim(0,1) +
   labs(
     x = "Time (Days)",
-    y = "Overall survival"
+    y = "Overall survival",
+    title = "Survival by UVA Score (adjusted)"
   ) + 
   theme(legend.position = 'top') +
   scale_fill_manual(
@@ -93,7 +96,8 @@ survfit2(Surv(time, status) ~ UVAgroup2, data = cases, start.time = 0) |>
   ) +
   scale_color_discrete(
     labels = c("Low Risk", "Medium Risk", "High Risk")
-  )
+  ) +
+  add_risktable()
 
 
 survfit2(Surv(time, status) ~ qSOFAgroup, data = cases, start.time = 0) |>
@@ -101,16 +105,18 @@ survfit2(Surv(time, status) ~ qSOFAgroup, data = cases, start.time = 0) |>
   ylim(0,1) +
   labs(
     x = "Time (Days)",
-    y = "Overall survival"
+    y = "Overall survival",
+    title = "Survival by qSOFA Score"
   ) + 
   theme(legend.position = 'top') +
   scale_fill_manual(
     values = c("red",  "green"),
-    labels = c("Low Risk", "High Risk")
+    labels = c("Low Risk (<2)", "High Risk (≥2)")
   ) +
   scale_color_discrete(
-    labels = c("Low Risk", "High Risk")
-  )
+    labels = c("Low Risk (<2)", "High Risk (≥2)")
+  ) +
+  add_risktable()
 
 
 survfit2(Surv(time, status) ~ MEWSgroup, data = cases, start.time = 0) |>
@@ -118,34 +124,38 @@ survfit2(Surv(time, status) ~ MEWSgroup, data = cases, start.time = 0) |>
   ylim(0,1) +
   labs(
     x = "Time (Days)",
-    y = "Overall survival"
+    y = "Overall survival",
+    title = "Survival by MEWS Score"
   ) + 
   theme(legend.position = 'top') +
   scale_fill_manual(
     values = c("red",  "green", "blue", "black"),
-    labels = c("No Risk", "Low Risk", "Medium Risk", "High Risk")
+    labels = c("Very Low Risk (0)", "Low Risk (1-2)", "Medium Risk (3-4)", "High Risk (>4)")
   ) +
   scale_color_manual(
     values = c("red", "green", "blue", "black"),
-    labels = c("No Risk", "Low Risk", "Medium Risk", "High Risk")
-  )
+    labels = c("Very Low Risk (0)", "Low Risk (1-2)", "Medium Risk (3-4)", "High Risk (>4)")
+  ) +
+  add_risktable()
 
 survfit2(Surv(time, status) ~ NEWSgroup, data = cases, start.time = 0) |>
   ggsurvfit() +
   ylim(0,1) +
   labs(
     x = "Time (Days)",
-    y = "Overall survival"
+    y = "Overall survival",
+    title = "Survival by NEWS Score"
   ) + 
   theme(legend.position = 'top') +
   scale_fill_manual(
     values = c("red",  "green", "blue"),
-    labels = c("Low Risk", "Medium Risk", "High Risk")
+    labels = c("Low Risk (<4)", "Medium Risk (4-6)", "High Risk (>6)")
   ) +
   scale_color_manual(
     values = c("red", "green", "blue"),
     labels = c("Low Risk", "Medium Risk", "High Risk")
-  )
+  ) +
+  add_risktable()
 
 
 
