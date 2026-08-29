@@ -24,8 +24,7 @@ library(survival)
 library(tidycmprsk)
 library(devtools)
 library(dunn.test)
-
-ezfun::set_ccf_palette("contrast")
+theme_gtsummary_compact()
 
 #load data
 hccdata <- read_csv("HCC Database.csv")
@@ -108,8 +107,9 @@ outputdata <-hccdata[,c('Sex','Age','Race', 'diagnosis for cirrhosis','AFP', 'ME
                         , 'TACE','RFA', 'y90', 'totalpreopburden', 'surgery type', 'Operative time', 
                         'Transfused pRBC (mL)', 'LOS (days post-op to discharge)', 
                         'Total tumor size', 'tumor number', 'tumor necrosis', 'Microvessel invasion',
-                        'Macrovessel invasion', 'Recurrence', 'Intra- vs Extra-hepatic', 'Survival',
-                        'Date of last follow up', 'AJCC staging', 'Date of death', 'size, largest'
+                        'Macrovessel invasion', 'Recurrence', 'Survival',
+                        'Date of last follow up','Operation date', 'AJCC staging', 'Date of death', 
+                        'size, largest'
                         )
                      ]
 outputnames <- read_excel("template names.xlsx")
@@ -156,7 +156,7 @@ outputtable$'Tumor_Size_cm' <- as.numeric(outputtable$Tumor_Size_cm)
 outputtable$Tumor_Number <- as.numeric(outputtable$Tumor_Number)
 outputtable$Explant_Necrosis_Percent <- as.numeric(outputtable$Explant_Necrosis_Percent)
 outputtable$Microvascular_Invasion <- as.numeric(outputtable$Microvascular_Invasion)
-outputtable$Macrovascular_Invasion <- as.numeric(outputtable$Microvascular_Invasion)
+outputtable$Macrovascular_Invasion <- as.numeric(outputtable$Macrovascular_Invasion)
 outputtable$Recurrence <- as.numeric(outputtable$Recurrence)
 #Explant necrosis fix
 outputtable$Explant_Necrosis_Percent[outputtable$Explant_Necrosis_Percent == "1"] <- "Yes"
@@ -165,12 +165,12 @@ outputtable$Explant_Necrosis_Percent[outputtable$Explant_Necrosis_Percent == "2"
 #Microvascular invasion fix
 outputtable$Microvascular_Invasion[outputtable$Microvascular_Invasion == "1"] <- 'Yes'
 outputtable$Microvascular_Invasion[outputtable$Microvascular_Invasion == "2"] <- 'No'
-outputtable$Microvascular_Invasion[outputtable$Microvascular_Invasion == "0"] <- NULL
+outputtable$Microvascular_Invasion[outputtable$Microvascular_Invasion == "0"] <- NA
 
 #Macrovascular invasion fix
 outputtable$Macrovascular_Invasion[outputtable$Macrovascular_Invasion == "1"] <- 'Yes'
 outputtable$Macrovascular_Invasion[outputtable$Macrovascular_Invasion == "2"] <- 'No'
-outputtable$Macrovascular_Invasion[outputtable$Macrovascular_Invasion == "0"] <- NULL
+outputtable$Macrovascular_Invasion[outputtable$Macrovascular_Invasion == "0"] <- NA
 
 #Recurrence fix
 outputtable$Recurrence[outputtable$Recurrence == "1"] <- "Yes"
@@ -182,6 +182,16 @@ outputtable$Total_IR_Burden[outputtable$Total_IR_Burden == '4'] <- '2'
 
 #removing all cases with no tumor resected.
 outputtable <- outputtable[is.na(outputtable$Tumor_size)==FALSE,]
+
+#adding sections for date of death and last f/U
+outputtable$Date_of_Death <- as.Date(outputtable$Date_of_Death)
+outputtable$Last_FU <- as.Date(outputtable$Last_FU, format = "%m/%d/%y")
+outputtable$Operation_date <- as.Date(outputtable$Operation_date)
+
+outputtable$'time to f/u'
+
+#tumor size fix
+outputtable$Tumor_size <- as.numeric(outputtable$Tumor_size)
 
 #the tables
 #[1] "...1"                     "Sex"                      "Age"                     
@@ -195,9 +205,16 @@ outputtable <- outputtable[is.na(outputtable$Tumor_size)==FALSE,]
 #[25] "Explant_Necrosis_Percent" "Microvascular_Invasion"   "Macrovascular_Invasion"  
 #[28] "Recurrence"               "Recurrence_Site"          "Survival_Status"         
 #[31] "Date_of_Death"            "Last_FU"  
-outputtable %>%
-  select('Sex','Age','Race', 'Cirrhosis_Etiology', 'MELD_Score', 'Total_IR_Burden') %>% 
-  tbl_summary(statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
+opensurg <- outputtable %>% 
+  filter(Surgery_Type == "Open", Age > 18)
+
+lapsurg <- outputtable %>%
+  filter(Surgery_Type == "Laparoscopic", Age > 18)
+
+#Table 1
+opensurg %>%
+  select('Sex','Age','Race', 'Cirrhosis_Etiology', 'MELD_Score', 'Total_IR_Burden', 'Surgery_Type') %>% 
+  tbl_summary(by= 'Total_IR_Burden', statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
               type = list(`Age` ~ "continuous2"),
               label = list(
                 Age = "Age, median (range), years",
@@ -209,10 +226,35 @@ outputtable %>%
                 MELD_Score = "MELD Score"
                 )
               ) |>
-  modify_header(label~"**Patient Demographics**")
+  modify_header(label~"**Patient Demographics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
+  )
+
+lapsurg %>%
+  select('Sex','Age','Race', 'Cirrhosis_Etiology', 'MELD_Score', 'Total_IR_Burden', 'Surgery_Type') %>% 
+  tbl_summary(by= 'Total_IR_Burden', statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
+              type = list(`Age` ~ "continuous2"),
+              label = list(
+                Age = "Age, median (range), years",
+                Sex = "Sex, No. (%)",
+                Race = "Race, No. (%)",
+                Total_IR_Burden = "Pre-operative IR Burden (TACE, RFA, 
+                and/or Radiation)",
+                Cirrhosis_Etiology = "Cirrhosis Etiology",
+                MELD_Score = "MELD Score"
+              )
+  ) |>
+  modify_header(label~"**Patient Demographics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
+  )
+
 
 #Table 2
-outputtable %>%
+opensurg %>%
   select('AFP_ng_mL','WBC', 'ALT', 'Creatinine', 'Total_Bilirubin', 'INR', 'Sodium', 'Total_IR_Burden') %>% 
   tbl_summary(by= 'Total_IR_Burden',
               statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
@@ -233,17 +275,24 @@ outputtable %>%
                 Sodium = "Sodium, median (range), mg/dL"
               )
   ) |> add_p()|>
-  modify_header(label~"**Pre-operative Characteristics**",
-                stat_1 ~ "**No previous IR surgery**  \nN = 174 ",
-                  stat_2 ~ "**Single previous IR surgery**  \nN = 90", 
-                stat_3 ~ '**Multiple previous IR surgeries**  \nN = 27'
-                )
+  modify_header(label~"**Pre-Operative Characteristics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
+  )
+# Install and load the package
+install.packages("dunn.test")
+library(dunn.test)
 
-#Table 3
-outputtable %>%
-  select('AFP_ng_mL','WBC', 'ALT', 'Creatinine', 'Total_Bilirubin', 'INR', 'Sodium','Total_IR_Burden') %>% 
-  tbl_summary(by= 'Total_IR_Burden'
-    ,statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
+# Perform Dunn's test using data vectors
+dunn.test(x = opensurg$ALT, g = opensurg$Total_IR_Burden, method = "holm")
+
+
+
+lapsurg %>%
+  select('AFP_ng_mL','WBC', 'ALT', 'Creatinine', 'Total_Bilirubin', 'INR', 'Sodium', 'Total_IR_Burden') %>% 
+  tbl_summary(by= 'Total_IR_Burden',
+              statistic = list(all_continuous() ~ "{median} ({min}, {max})"),
               type = list(`AFP_ng_mL` ~ "continuous2",
                           'WBC' ~ "continuous2",
                           'ALT' ~ "continuous2",
@@ -260,14 +309,16 @@ outputtable %>%
                 INR = "INR, median (range)",
                 Sodium = "Sodium, median (range), mg/dL"
               )
-  ) |> add_p() |>
-  modify_header(label~"**Pre-operative Characteristics**",
-                stat_1 ~ "**No previous IR surgery**  \nN = 174 ",
-                stat_2 ~ "**Single previous IR surgery**  \nN = 90", 
-                stat_3 ~ '**Multiple previous IR surgeries**  \nN = 27'
-  ) 
-#Table 4
-outputtable %>%
+  ) |> add_p()|>
+  modify_header(label~"**Pre-Operative Characteristics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
+  )
+
+
+#Table 3
+opensurg %>%
   select('Surgery_Type', 'Operative_Time_min', 
          'pRBC_Transfused_mL', 'LOS_days', 'Survival_Status','Total_IR_Burden') %>%
   tbl_summary(by = 'Total_IR_Burden', 
@@ -283,18 +334,43 @@ outputtable %>%
                 )
               ) |> add_p() |>
   modify_header(label~"**Intra-operative Characteristics**",
-                stat_1 ~ "**No previous IR surgery**  \nN = 174 ",
-                stat_2 ~ "**Single previous IR surgery**  \nN = 90", 
-                stat_3 ~ '**Multiple previous IR surgeries**  \nN = 27'
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
   ) 
 
-outputtable$Date_of_Death <- as.Date(outputtable$Date_of_Death)
-outputtable$Last_FU <- as.Date(outputtable$Last_FU, format = "%m/%d/%y")
-outputtable$Tumor_size <- as.numeric(outputtable$Tumor_size)
-#Table 5
-outputtable %>%
-  select("Tumor_size", "Tumor_Number", "Explant_Necrosis_Percent", "Microvascular_Invasion", 
-         "Macrovascular_Invasion", "Recurrence", "Recurrence_Site", 'Total_IR_Burden', 'AJCC_Staging') %>%
+lapsurg$pRBC_Transfused_mL <- as.numeric(lapsurg$pRBC_Transfused_mL)
+lapsurg$LOS_days <- as.numeric(lapsurg$LOS_days)
+
+lapsurg %>%
+  select('Operative_Time_min', 
+         'pRBC_Transfused_mL', 'LOS_days', 'Survival_Status', 'Total_IR_Burden') %>%
+  tbl_summary(by = 'Total_IR_Burden', 
+              type = list('pRBC_Transfused_mL' ~ "continuous2",
+                          'LOS_days' ~ "continuous2"
+              ),
+              label = list(
+                Surgery_Type = "Surgery Type, no (%)",
+                Operative_Time_min = "Operative time, median (range), min",
+                pRBC_Transfused_mL = "Transfused pRBC, median (range), mL",
+                LOS_days = "Length of Stay, median (range), days",
+                Total_Bilirubin = "T. bil, median (range), mg/dL",
+                INR = "INR, median (range)",
+                Sodium = "Sodium, median (range), mg/dL",
+                Survival_Status = "% patients alive, no. (%)"
+              )
+  ) |> add_p() |>
+  modify_header(label~"**Intra-operative Characteristics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
+  ) 
+
+
+#Table 4
+opensurg %>%
+  select("Tumor_size", "Tumor_Number", "Explant_Necrosis_Percent",
+         "Recurrence", 'Total_IR_Burden', 'AJCC_Staging') %>%
   tbl_summary(by = 'Total_IR_Burden',
               label = list(
                 Tumor_size = "Tumor size, Median (range), cm",
@@ -302,14 +378,32 @@ outputtable %>%
                 Explant_Necrosis_Percent = "Necrosis present in tumor, no, (%)",
                 Microvascular_Invasion = "Microvascular Invasion, no., (%)",
                 Macrovascular_Invasion = "Macrovascular Invasion, no., (%)",
-                Recurrence = "Recurrence, No. (%)",
-                Recurrence_Site = "Recurrence site, no, %"
+                Recurrence = "Recurrence, No. (%)"
                 )
               )|> add_p() |>
-  modify_header(label~"**Tumor Characteristics**",
-                stat_1 ~ "**No previous IR surgery**  \nN = 174 ",
-                stat_2 ~ "**Single previous IR surgery**  \nN = 90", 
-                stat_3 ~ '**Multiple previous IR surgeries**  \nN = 27'
+  modify_header(label~"**Intra-operative Characteristics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
+  ) 
+
+lapsurg %>%
+  select("Tumor_size", "Tumor_Number", "Explant_Necrosis_Percent",
+         "Recurrence", 'Total_IR_Burden', 'AJCC_Staging') %>%
+  tbl_summary(by = 'Total_IR_Burden',
+              label = list(
+                Tumor_size = "Tumor size, Median (range), cm",
+                Tumor_Number = "Tumor number, no. (%)",
+                Explant_Necrosis_Percent = "Necrosis present in tumor, no, (%)",
+                Microvascular_Invasion = "Microvascular Invasion, no., (%)",
+                Macrovascular_Invasion = "Macrovascular Invasion, no., (%)",
+                Recurrence = "Recurrence, No. (%)"
+              )
+  )|> add_p() |>
+  modify_header(label~"**Intra-operative Characteristics**",
+                stat_1 ~ "**No previous IR surgery**",
+                stat_2 ~ "**Single previous IR surgery**", 
+                stat_3 ~ '**Multiple previous IR surgeries**'
   ) 
 
 #Table 5

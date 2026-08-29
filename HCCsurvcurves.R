@@ -23,7 +23,7 @@ library(survival)
 library(tidycmprsk)
 library(devtools)
 library(patchwork)
-
+theme_gtsummary_compact()
 
 outputtable <- read_xlsx("NewData.xlsx")
 #remove all commas in the service of making everything that needs to be numeric numeric
@@ -74,6 +74,8 @@ outputtable$Date_of_Death <- as.Date(outputtable$Date_of_Death, format = "%m/%d/
 outputtable$Last_FU <- as.Date(outputtable$Last_FU, format = "%m/%d/%Y")
 outputtable$Tumor_size <- as.numeric(outputtable$Tumor_size)
 
+
+
 #Cox test 
 last_fusurvcurve <-as.integer(as.Date(outputtable$Last_FU, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
 time <- as.integer(as.Date(outputtable$Date_of_Death, format = "%m/%d/%Y") - as.Date("1/1/2010", format = "%m/%d/%Y"))
@@ -85,12 +87,31 @@ outputtable$Survival_Status[outputtable$Survival_Status == "No"] <- "1"
 status <- as.integer(outputtable$Survival_Status)
 outputtable$Total_IR_Burden <- factor(outputtable$Total_IR_Burden)
 
-hcccox <- coxph(Surv(time, status)~ Total_IR_Burden + Age + ALT + MELD_Score
-                + Tumor_size + Tumor_Number, data = outputtable)
-summary(hcccox)
 
+opensurg <- outputtable %>% 
+  filter(Surgery_Type == "Open", Age > 18)
+
+opentime <- time[outputtable$Surgery_Type == "Open"]
+
+openstatus <- status[outputtable$Surgery_Type == "Open"]
+
+lapsurg <- outputtable %>%
+  filter(Surgery_Type == "Laparoscopic", Age > 18)
 library(broom)
 library(car)
+opensurgcox <- coxph(Surv(opentime, openstatus)~ Total_IR_Burden + Age + ALT + MELD_Score
+        + Tumor_size + Tumor_Number, data = opensurg)
+
+write.csv(tidy(opensurgcox, exponentiate = TRUE, conf.int = TRUE), "opensurgcox_results.csv", row.names = FALSE)
+
+lapsurgcox <- coxph(Surv(time, status)~ Total_IR_Burden + Age + ALT + MELD_Score
+                    + Tumor_size + Tumor_Number, data = lapsurg)
+
+write.csv(tidy(lapsurgcox, exponentiate = TRUE, conf.int = TRUE), "lapsurgcox_results.csv", row.names = FALSE)
+
+
+
+
 write.csv(tidy(hcccox, exponentiate = TRUE, conf.int = TRUE), "HCCcox_results.csv", row.names = FALSE)
 cox.zph(hcccox)
 
